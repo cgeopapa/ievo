@@ -2,6 +2,7 @@ import subprocess
 import sys
 import os
 import progressbar
+from update import update
 
 
 # Gets all files in given directory
@@ -58,11 +59,11 @@ Finally don't forget to add the executable to your PATH. The executable is usual
         return False
 
 
-def main():
-    if len(sys.argv) != 2:
+def check():
+    if len(sys.argv) != 3:
         print(r'Usage: ievo PATH_TO_DIRECTORY_TO_CHECK')
         exit(1)
-    path = sys.argv[1]
+    path = sys.argv[2]
     if not os.path.isdir(path):
         print("The given argument is not a valid path")
         exit(1)
@@ -73,6 +74,13 @@ def main():
     if len(unver_files) == 0:
         print("All files are clear")
         exit(0)
+
+
+def main():
+    if sys.argv[1] == '-u' or sys.argv[1] == '--update':
+        update()
+    elif sys.argv[1] == '-c' or sys.argv[1] == '--check':
+        check()
 
 
 if __name__ == "__main__":
