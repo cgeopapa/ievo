@@ -212,3 +212,6 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 
 rds_modernm/
+/tempNSRL.zip
+/nsrl.db
+/nsrl.db-journal

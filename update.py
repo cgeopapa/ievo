@@ -1,23 +1,26 @@
 import sys
-
 import requests
-import io
+import sqlite3
 import progressbar
 import os
-from contextlib import closing
+import csv
 from zipfile import ZipFile
 
 
-# url = r'http://www.pythonchallenge.com/pc/def/channel.zip'
 url = 'https://s3.amazonaws.com/rds.nsrl.nist.gov/RDS/current/rds_modernm.zip'
+tempNSRL = "tempNSRL.zip"
 
 
 def update():
     if len(sys.argv) == 3:
         if not os.path.isfile(sys.argv[2]):
             print('You need to provide the path to the NSRLFile.txt')
+            exit(1)
+        else:
+            with open(sys.argv[2], 'r', encoding='utf-8') as file:
+                loadNRSL(file)
     else:
-        print('You did not specify the path for the NSRLFile.txt. If you do not have that file downloaded it can be downloaded now. Do you want to proceed? (Y/n)')
+        print('You did not specify the path for the NSRLFile.txt.\n If you do not have that file downloaded it can be downloaded now. Do you want to proceed? (Y/n)', end=' ')
         done = False
         while not done:
             download = input().lower()
@@ -30,15 +33,38 @@ def update():
                 pb = progressbar.ProgressBar(maxval=total_size_in_bytes,
                                              widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
                 pb.start()
-                zipfile = io.BytesIO(r.content)
-                for data in r.iter_content(1024):
-                    pb.update(len(data))
-                    zipfile = io.BytesIO(r.content)
-                pb.finish()
-                with closing(r), ZipFile(zipfile) as archive:
-                    print({member.filename: archive.read(member) for member in archive.infolist()})
-                # open('test.zip', 'wb').write(r.content)
+                with open(tempNSRL, 'wb') as file:
+                    for data in r.iter_content(1024):
+                        pb.update(os.path.getsize(file.name))
+                        file.write(data)
+                    pb.finish()
+                    file.close()
+                print("Download complete. Extracting rds...")
+                with ZipFile(tempNSRL, 'r') as zipFile:
+                    zipFile.extract(r'rds_modernm/NSRLFile.txt')
+                with open(r'rds_modernm/NSRLFile.txt', 'r') as file:
+                    loadNRSL(file)
             elif download == 'n':
                 done = True
                 print('Aborting...')
                 exit(0)
+
+
+def loadNRSL(file):
+    os.remove(r'nsrl.db')
+    db = sqlite3.connect('nsrl.db')
+    cursor = db.cursor()
+    cursor.execute("""CREATE TABLE IF NOT EXISTS hashes(sha1 VARCHAR(40) NOT NULL, md5 VARCHAR(32) NOT NULL);""")
+    cursor.execute("""CREATE INDEX hashindex ON hashes(sha1, md5);""")
+
+    nsrl = csv.reader(file, delimiter=',', quotechar='"')
+    _ = next(nsrl, None)
+    c = 0
+    cursor.execute("""BEGIN TRANSACTION;""")
+    for line in nsrl:
+        s = """INSERT INTO hashes VALUES("{}", "{}");""".format(line[0], line[1])
+        cursor.execute(s)
+        c = c+1
+        print("Added {} hashes to db".format(c), end='\r')
+        if c % 50000 == 0:
+            cursor.execute("COMMIT;")
