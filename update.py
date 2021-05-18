@@ -1,9 +1,7 @@
 import sys
 import requests
-import sqlite3
 import progressbar
 import os
-import csv
 from zipfile import ZipFile
 
 
@@ -17,8 +15,8 @@ def update():
             print('You need to provide the path to the NSRLFile.txt')
             exit(1)
         else:
-            with open(sys.argv[2], 'r', encoding='utf-8') as file:
-                loadNRSL(file)
+            rds_loc(sys.argv[2])
+            print("Updated rds location")
     else:
         print('You did not specify the path for the NSRLFile.txt.\n If you do not have that file downloaded it can be downloaded now. Do you want to proceed? (Y/n)', end=' ')
         done = False
@@ -42,29 +40,34 @@ def update():
                 print("Download complete. Extracting rds...")
                 with ZipFile(tempNSRL, 'r') as zipFile:
                     zipFile.extract(r'rds_modernm/NSRLFile.txt')
-                with open(r'rds_modernm/NSRLFile.txt', 'r') as file:
-                    loadNRSL(file)
+                rds_loc(r'rds_modernm/NSRLFile.txt')
             elif download == 'n':
                 done = True
                 print('Aborting...')
                 exit(0)
 
 
-def loadNRSL(file):
-    os.remove(r'nsrl.db')
-    db = sqlite3.connect('nsrl.db')
-    cursor = db.cursor()
-    cursor.execute("""CREATE TABLE IF NOT EXISTS hashes(sha1 VARCHAR(40) NOT NULL, md5 VARCHAR(32) NOT NULL);""")
-    cursor.execute("""CREATE INDEX hashindex ON hashes(sha1, md5);""")
+def rds_loc(path):
+    with open('ievo.conf', 'w') as conf:
+        conf.write(path)
+        conf.close()
 
-    nsrl = csv.reader(file, delimiter=',', quotechar='"')
-    _ = next(nsrl, None)
-    c = 0
-    cursor.execute("""BEGIN TRANSACTION;""")
-    for line in nsrl:
-        s = """INSERT INTO hashes VALUES("{}", "{}");""".format(line[0], line[1])
-        cursor.execute(s)
-        c = c+1
-        print("Added {} hashes to db".format(c), end='\r')
-        if c % 50000 == 0:
-            cursor.execute("COMMIT;")
+
+# def loadNRSL(file):
+#     os.remove(r'nsrl.db')
+#     db = sqlite3.connect('nsrl.db')
+#     cursor = db.cursor()
+#     cursor.execute("""CREATE TABLE IF NOT EXISTS hashes(sha1 VARCHAR(40) NOT NULL, md5 VARCHAR(32) NOT NULL);""")
+#     cursor.execute("""CREATE INDEX hashindex ON hashes(sha1, md5);""")
+#
+#     nsrl = csv.reader(file, delimiter=',', quotechar='"')
+#     _ = next(nsrl, None)
+#     c = 0
+#     cursor.execute("""BEGIN TRANSACTION;""")
+#     for line in nsrl:
+#         s = """INSERT INTO hashes VALUES("{}", "{}");""".format(line[0], line[1])
+#         cursor.execute(s)
+#         c = c+1
+#         print("Added {} hashes to db".format(c), end='\r')
+#         if c % 50000 == 0:
+#             cursor.execute("COMMIT;")

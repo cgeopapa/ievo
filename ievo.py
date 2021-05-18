@@ -1,8 +1,11 @@
+import csv
 import subprocess
 import sys
 import os
 import progressbar
 from update import update
+import hashlib
+from termcolor import colored
 
 
 # Gets all files in given directory
@@ -26,7 +29,7 @@ def verify_files(files):
     for file in files:
         process = subprocess.run(['signtool', 'verify', '/pa', file], stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
         if process.returncode == 1:
-            unver_files.append(files)
+            unver_files.append(file)
         else:
             vered = vered + 1
         f = f + 1
@@ -35,6 +38,44 @@ def verify_files(files):
     pb.finish()
     print("Successfully verified {} files. Remaining {}".format(vered, len(unver_files)))
     return unver_files
+
+
+# Remove files that are included in the nsrl dataset
+def nsrl_verify_files(files):
+    print('Generating file hashes')
+    fileHash = []
+    pb = progressbar.ProgressBar(maxval=len(files), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.SimpleProgress()])
+    pb.start()
+    for file in files:
+        with open(file, 'rb') as f:
+            sha1 = str(hashlib.sha1(f.read()).hexdigest()).upper()
+            md5 = str(hashlib.md5(f.read()).hexdigest()).upper()
+            fileHash.append((sha1, md5, file))
+            f.close()
+            pb.update(len(fileHash))
+    fileHash = sorted(fileHash)
+    pb.finish()
+    conf = open('ievo.conf', 'r')
+    fileLoc = conf.readline()
+    conf.close()
+
+    rds = open(fileLoc, 'r', encoding='utf-8')
+    nsrl = csv.reader(rds, delimiter=',', quotechar='"')
+    next(nsrl, None)
+
+    c = 0
+    print("Now searching for hashes in the NSRL rds...")
+    for line in nsrl:
+        if fileHash[c][0] < line[0]:
+            print(colored('File {} not found [❌ ]'.format(fileHash[c][2]), 'red'), '\n\t{} more hashes remaining...'.format(len(fileHash)-(c+1)), end='\r')
+            c = c + 1
+        if line[0] == fileHash[c][0] and line[1] == fileHash[c][1]:
+            print(colored('Found file {} [✔]'.format(fileHash[c][2]), 'green'), '\n\t{} more hashes remaining...'.format(len(fileHash)-(c+1)), end='/r')
+            fileHash.pop(c)
+        if c == len(fileHash)-1:
+            break
+    rds.close()
+    return files
 
 
 # Check if signtool is installed
@@ -70,8 +111,16 @@ def check():
     files = get_files(path)
     if not is_signtool_setupped():
         exit(1)
-    unver_files = verify_files(files)
-    if len(unver_files) == 0:
+    if not os.path.isfile('ievo.conf'):
+        print('You need to execute "python3 ievo.py -u" before executing a check in order to get the latest NIST NSRL rds dataset.\n'
+              'If you already have one downloaded in your system execute "python3 ievo.py -u path/to/NSRLFile.txt".')
+        exit(1)
+    files = verify_files(files)
+    if len(files) == 0:
+        print("All files are clear")
+        exit(0)
+    files = nsrl_verify_files(files)
+    if len(files) == 0:
         print("All files are clear")
         exit(0)
 
