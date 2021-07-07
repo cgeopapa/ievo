@@ -197,9 +197,9 @@ def main():
         -u  --update    Update the configuration. Import your Virus Total API key and download or import the path to
                         the NSRL dataset.
         -c  --check (options) [path]    Check all files in the specified directory.
-            options:    -z  In phase 3 Zip all remaining files and then make just one upload to Virus Total. Cannot be 
-                            used with -a.
+            options:    -z  In phase 3 Zip all remaining files and then make just one upload to Virus Total. Cannot be used with -a.
                         -a  In phase 3 upload one by one All remaining files to Virus Total. Cannot be used with -z.
+                        -[1,2,3] Choose which of the 3 phases you want to execute. Order doesn't matter, phase 1 will always be the first. Default all of them (-123).
         ''')
 
 
