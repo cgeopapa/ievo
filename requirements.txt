@@ -2,3 +2,4 @@ progressbar~=2.5
 requests~=2.25.1
 termcolor~=1.1.0
 python-dotenv~=0.18.0
+vt-py~=0.6.3
