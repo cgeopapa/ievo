@@ -216,3 +216,5 @@ rds_modernm/
 /nsrl.db
 /nsrl.db-journal
 /ievo.conf
+/scan_results.json
+/tmp.zip

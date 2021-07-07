@@ -3,11 +3,13 @@ import requests
 import progressbar
 import os
 from zipfile import ZipFile
+import dotenv
 
 
 url = 'https://s3.amazonaws.com/rds.nsrl.nist.gov/RDS/current/rds_modernm.zip'
 tempNSRL = "tempNSRL.zip"
 apikey = 'vt_api_key'
+rdsloc = 'rds_location'
 
 
 def update():
@@ -17,11 +19,11 @@ def update():
         if updateKey == 'y':
             print('Please provide you new Virus Total API key')
             newKey = input()
-            os.environ[apikey] = newKey
+            dotenv.set_key(dotenv.find_dotenv(), apikey, newKey)
     else:
-        print('Please provide you Virus Total API key')
+        print('Please provide your Virus Total API key')
         newKey = input()
-        os.environ[apikey] = newKey
+        dotenv.set_key(dotenv.find_dotenv(), apikey, newKey)
     if len(sys.argv) == 3:
         if not os.path.isfile(sys.argv[2]):
             print('You need to provide the path to the NSRLFile.txt')
@@ -61,6 +63,4 @@ def update():
 
 
 def rds_loc(path):
-    with open('ievo.conf', 'w') as conf:
-        conf.write(path)
-        conf.close()
+    dotenv.set_key(dotenv.find_dotenv(), rdsloc, path)
