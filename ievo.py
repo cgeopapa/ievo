@@ -1,19 +1,14 @@
-import csv
+import os
+import re
 import subprocess
 import sys
-import os
-import time
-import json
+from checkers.nsrlCheck import nsrl_check_files
+from checkers.signtoolCheck import cigntool_check_files
+from checkers.virusTotalCheck import virus_total_check_files
 import dotenv
-import progressbar
-from update import update
-import hashlib
-from termcolor import colored
-import vt
-import re
-from zipfile import ZipFile
-from update import apikey
+
 from update import rdsloc
+from update import update
 
 
 # Gets all files in given directory
@@ -24,90 +19,6 @@ def get_files(path):
             files.append(os.path.join(r, file))
     print("Found {} files in directory {}\n".format(len(files), path))
     return files
-
-
-# Removes digitally signed files
-def verify_files(files):
-    print('--== PHASE 1 ==--')
-    print("Checking files for digital signature")
-    unver_files = []
-    vered = 0
-    f = 0
-    pb = progressbar.ProgressBar(maxval=len(files), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.SimpleProgress()])
-    pb.start()
-    for file in files:
-        process = subprocess.run(['signtool', 'verify', '/pa', file], stderr=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
-        if process.returncode == 1:
-            unver_files.append(file)
-        else:
-            vered = vered + 1
-        f = f + 1
-        pb.update(f)
-
-    pb.finish()
-    print("Successfully verified {} files. Remaining {}".format(vered, len(unver_files)))
-    return unver_files
-
-
-# Remove files that are included in the nsrl dataset
-def nsrl_verify_files(files):
-    print('--== PHASE 2 ==--')
-    print('Generating file hashes')
-    fileHash = []
-    pb = progressbar.ProgressBar(maxval=len(files), widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.SimpleProgress()])
-    pb.start()
-    for file in files:
-        with open(file, 'rb') as f:
-            sha1 = str(hashlib.sha1(f.read()).hexdigest()).upper()
-            md5 = str(hashlib.md5(f.read()).hexdigest()).upper()
-            fileHash.append((sha1, md5, file))
-            f.close()
-            pb.update(len(fileHash))
-    fileHash = sorted(fileHash)
-    pb.finish()
-    fileLoc = os.environ.get(rdsloc)
-
-    rds = open(fileLoc, 'r', encoding='utf-8')
-    nsrl = csv.reader(rds, delimiter=',', quotechar='"')
-    next(nsrl, None)
-
-    c = 0
-    print("Now searching for hashes in the NSRL rds...")
-    for line in nsrl:
-        if fileHash[c][0] < line[0]:
-            print(colored('File {} not found [❌ ]'.format(fileHash[c][2]), 'red'), '\n\t{} more hashes remaining...'.format(len(fileHash)-(c+1)), end='\r')
-            c = c + 1
-        if line[0] == fileHash[c][0] and line[1] == fileHash[c][1]:
-            print(colored('Found file {} [✔]'.format(fileHash[c][2]), 'green'), '\n\t{} more hashes remaining...'.format(len(fileHash)-(c+1)), end='/r')
-            fileHash.pop(c)
-        if c == len(fileHash)-1:
-            break
-    rds.close()
-    return files
-
-
-def virus_total_files(files, z):
-    print('--== PHASE 3 ==--')
-    client = vt.Client(os.environ.get(apikey))
-    if z:
-        print("Generating zip file...")
-        with ZipFile('tmp.zip', 'w') as zipObj:
-            for file in files:
-                zipObj.write(file)
-        print('Uploading files to virus total...')
-        with open('tmp.zip', "rb") as f:
-            fileScan = client.scan_file(f)
-            print("Upload complete. Waiting for Virus Total analysis results...")
-            while True:
-                analysis = client.get_object("/analyses/{}", fileScan.id)
-                print(analysis.status, end='\r')
-                if analysis.status == "completed":
-                    with open("scan_results.json", 'w') as res:
-                        j = analysis.results
-                        j["id"] = analysis.results
-                        json.dump(j, res)
-                    break
-                time.sleep(5)
 
 
 # Check if signtool is installed
@@ -148,10 +59,10 @@ def check():
             exit(1)
     else:
         options = sys.argv[2]
-        if re.match(r"\-[a,z,1,2,3]+", options):
+        if re.match(r"-[az123]+", options):
             options = options[1:]
             z = 'a' not in options
-            if re.match(r"[1,2,3]+", options):
+            if re.match(r"[123]+", options):
                 exe1 = '1' in options
                 exe2 = '2' in options
                 exe3 = '3' in options
@@ -170,17 +81,17 @@ def check():
               'If you already have one downloaded in your system execute "python3 ievo.py -u path/to/NSRLFile.txt".')
         exit(1)
     if exe1:
-        files = verify_files(files)
+        files = cigntool_check_files(files)
     if len(files) == 0:
         print("All files are clear")
         exit(0)
     if exe2:
-        files = nsrl_verify_files(files)
+        files = nsrl_check_files(files)
     if len(files) == 0:
         print("All files are clear")
         exit(0)
     if exe3:
-        virus_total_files(files, z)
+        virus_total_check_files(files, z)
 
 
 def main():
