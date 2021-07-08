@@ -62,7 +62,7 @@ def check():
         if re.match(r"-[az123]+", options):
             options = options[1:]
             z = 'a' not in options
-            if re.match(r"[123]+", options):
+            if re.search(r"[123]+", options):
                 exe1 = '1' in options
                 exe2 = '2' in options
                 exe3 = '3' in options
